@@ -1,0 +1,170 @@
+import logging
+from functools import wraps
+from telegram import Update, InlineKeyboardButton, InlineKeyboardMarkup
+from telegram.ext import ContextTypes
+import asyncio
+
+from config import ADMIN_ID
+from database import SessionLocal, AdminSettings, User
+
+logger = logging.getLogger(__name__)
+
+# Decorator to check if the user is an admin
+def admin_only(func):
+    @wraps(func)
+    async def wrapped(update: Update, context: ContextTypes.DEFAULT_TYPE, *args, **kwargs):
+        if update.effective_user.id != ADMIN_ID:
+            await update.message.reply_text("⛔️ माफ कीजिए, यह कमांड केवल एडमिन के लिए है।")
+            return
+        return await func(update, context, *args, **kwargs)
+    return wrapped
+
+@admin_only
+async def set_channel(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    try:
+        channel_id = int(context.args[0])
+        db = SessionLocal()
+        settings = db.query(AdminSettings).filter(AdminSettings.id == 1).first()
+        settings.channel_id = channel_id
+        db.commit()
+        await update.message.reply_text(f"✅ चैनल ID `{channel_id}` सफलतापूर्वक सेट हो गया है।")
+    except (IndexError, ValueError):
+        await update.message.reply_text("⚠️ कृपया सही फॉर्मेट का उपयोग करें: `/setch <channel_id>`")
+    finally:
+        db.close()
+
+@admin_only
+async def my_set_channel(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    db = SessionLocal()
+    settings = db.query(AdminSettings).filter(AdminSettings.id == 1).first()
+    channel_id = settings.channel_id
+    db.close()
+    if channel_id:
+        await update.message.reply_text(f"ℹ️ वर्तमान में सेट चैनल ID है: `{channel_id}`")
+    else:
+        await update.message.reply_text("ℹ️ अभी तक कोई चैनल सेट नहीं किया गया है। `/setch` का उपयोग करें।")
+
+@admin_only
+async def set_domain(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    try:
+        domain = context.args[0]
+        db = SessionLocal()
+        settings = db.query(AdminSettings).filter(AdminSettings.id == 1).first()
+        settings.shortener_domain = domain
+        db.commit()
+        await update.message.reply_text(f"✅ Shortener डोमेन `{domain}` सफलतापूर्वक सेट हो गया है।")
+    except IndexError:
+        await update.message.reply_text("⚠️ कृपया सही फॉर्मेट का उपयोग करें: `/setdomain <domain.com>`")
+    finally:
+        db.close()
+
+@admin_only
+async def set_api(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    try:
+        api_key = context.args[0]
+        db = SessionLocal()
+        settings = db.query(AdminSettings).filter(AdminSettings.id == 1).first()
+        settings.shortener_api = api_key
+        db.commit()
+        await update.message.reply_text("✅ Shortener API की सफलतापूर्वक सेट हो गई है।")
+    except IndexError:
+        await update.message.reply_text("⚠️ कृपया सही फॉर्मेट का उपयोग करें: `/setapi <api_key>`")
+    finally:
+        db.close()
+
+@admin_only
+async def set_time(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    if not context.args:
+        await update.message.reply_text("⚠️ फॉर्मेट: `/settime <number> <unit>`\nUnit: `s`, `m`, `h`, `d` (seconds, minutes, hours, days)")
+        return
+    try:
+        value = int(context.args[0])
+        unit = context.args[1].lower()
+        
+        if unit == 's':
+            seconds = value
+        elif unit == 'm':
+            seconds = value * 60
+        elif unit == 'h':
+            seconds = value * 3600
+        elif unit == 'd':
+            seconds = value * 86400
+        else:
+            await update.message.reply_text("⚠️ अमान्य यूनिट! कृपया `s`, `m`, `h`, or `d` का उपयोग करें।")
+            return
+
+        db = SessionLocal()
+        settings = db.query(AdminSettings).filter(AdminSettings.id == 1).first()
+        settings.invite_duration_seconds = seconds
+        db.commit()
+        await update.message.reply_text(f"✅ लिंक की वैधता `{value} {unit}` ({seconds} सेकंड) पर सेट कर दी गई है।")
+    except (IndexError, ValueError):
+        await update.message.reply_text("⚠️ अमान्य फॉर्मेट! `/settime <number> <unit>` का उपयोग करें।")
+    finally:
+        db.close()
+
+@admin_only
+async def stats(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    db = SessionLocal()
+    user_count = db.query(User).count()
+    db.close()
+    await update.message.reply_text(f"📊 बॉट के कुल यूजर्स: **{user_count}**")
+
+@admin_only
+async def broadcast(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    if not context.args:
+        await update.message.reply_text("⚠️ कृपया ब्रॉडकास्ट करने के लिए एक संदेश लिखें: `/broadcast <message>`")
+        return
+    
+    message_to_send = " ".join(context.args)
+    
+    db = SessionLocal()
+    all_users = db.query(User.user_id).all()
+    db.close()
+    
+    if not all_users:
+        await update.message.reply_text("Broadcast करने के लिए कोई यूजर नहीं है।")
+        return
+
+    total_users = len(all_users)
+    sent_count = 0
+    failed_count = 0
+    
+    status_message = await update.message.reply_text(f"📣 ब्रॉडकास्ट शुरू हो रहा है... 0/{total_users} को भेजा गया।")
+    
+    for i, (user_id,) in enumerate(all_users):
+        try:
+            await context.bot.send_message(chat_id=user_id, text=message_to_send, parse_mode='HTML')
+            
+            # Message ko PIN karna (optional, user ko disturb kar sakta hai)
+            # sent_msg = await context.bot.send_message(...)
+            # await context.bot.pin_chat_message(chat_id=user_id, message_id=sent_msg.message_id)
+
+            sent_count += 1
+        except Exception as e:
+            failed_count += 1
+            logger.warning(f"User {user_id} को broadcast भेजने में विफल: {e}")
+        
+        # Har 10 users ke baad status update karna
+        if (i + 1) % 10 == 0 or (i + 1) == total_users:
+            progress = (i + 1) / total_users
+            bar_length = 10
+            filled_length = int(bar_length * progress)
+            bar = '█' * filled_length + '░' * (bar_length - filled_length)
+            
+            try:
+                await status_message.edit_text(
+                    f"📣 ब्रॉडकास्ट जारी है...\n`{bar}`\n"
+                    f"भेजा गया: {sent_count}/{total_users}\n"
+                    f"विफल: {failed_count}",
+                    parse_mode='MarkdownV2'
+                )
+            except Exception:
+                pass # Ignore if editing fails
+        await asyncio.sleep(0.1) # Rate limit se bachne ke liye thoda delay
+
+    await status_message.edit_text(
+        f"✅ ब्रॉडकास्ट पूरा हुआ!\n\n"
+        f"सफलतापूर्वक भेजा गया: {sent_count}\n"
+        f"विफल हुए: {failed_count}"
+    )
