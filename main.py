@@ -10,7 +10,6 @@ from handlers.user_commands import start
 from handlers.admin_commands import (
     set_channel, my_set_channel, set_domain, set_api, set_time, stats, broadcast
 )
-from database import init_db
 
 # Logging setup karna
 logging.basicConfig(
@@ -22,9 +21,6 @@ logger = logging.getLogger(__name__)
 
 def main() -> None:
     """Bot ko start aur run karta hai."""
-    
-    logger.info("Database ko initialize kiya ja raha hai...")
-    init_db() # Yeh ensure karega ki tables maujood hain
     
     logger.info("Bot application banaya ja raha hai...")
     application = Application.builder().token(BOT_TOKEN).build()
