@@ -1,42 +1,41 @@
-from sqlalchemy import create_engine, Column, Integer, String, BigInteger, Boolean, Float
-from sqlalchemy.orm import sessionmaker, declarative_base
-import datetime
+import logging
+from pymongo import MongoClient
+from pymongo.errors import ConnectionFailure
+from config import MONGO_URI
 
-# Database ka setup
-DATABASE_URL = "sqlite:///bot_data.db"
-engine = create_engine(DATABASE_URL, connect_args={"check_same_thread": False})
-SessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine)
-Base = declarative_base()
+logger = logging.getLogger(__name__)
 
-# Admin Settings ke liye Table/Model
-class AdminSettings(Base):
-    __tablename__ = "admin_settings"
-    id = Column(Integer, primary_key=True, index=True, default=1)
-    channel_id = Column(BigInteger, nullable=True)
-    shortener_api = Column(String, nullable=True)
-    shortener_domain = Column(String, nullable=True)
-    invite_duration_seconds = Column(Integer, default=86400) # Default: 1 din
+# MongoDB Client Setup
+try:
+    client = MongoClient(MONGO_URI)
+    # The ismaster command is cheap and does not require auth.
+    client.admin.command('ismaster')
+    logger.info("MongoDB se safaltapurvak connect ho gaya.")
+except ConnectionFailure as e:
+    logger.error(f"MongoDB se connect nahi ho paya: {e}")
+    # Aap yahan bot ko exit karna bhi choose kar sakte hain
+    # exit() 
+    raise
 
-# Users ke liye Table/Model
-class User(Base):
-    __tablename__ = "users"
-    user_id = Column(BigInteger, primary_key=True, index=True, unique=True)
-    has_received_free_link = Column(Boolean, default=False)
-    last_link_timestamp = Column(Float, nullable=True)
-
-# Database aur tables create karna
-def init_db():
-    Base.metadata.create_all(bind=engine)
+# Database aur Collections ko define karna
+db = client.get_database("TelegramBotDB") # Aap database ka naam badal sakte hain
+admin_settings = db.get_collection("admin_settings")
+users_collection = db.get_collection("users")
 
 # Helper function jo admin settings ko get ya create karega
-def get_or_create_admin_settings(db):
-    settings = db.query(AdminSettings).filter(AdminSettings.id == 1).first()
+def get_admin_settings():
+    """Admin settings document ko get ya create karta hai."""
+    settings = admin_settings.find_one({"_id": 1})
     if not settings:
-        settings = AdminSettings(id=1)
-        db.add(settings)
-        db.commit()
-        db.refresh(settings)
+        # Default settings create karna
+        default_settings = {
+            "_id": 1,
+            "channel_id": None,
+            "shortener_api": None,
+            "shortener_domain": None,
+            "invite_duration_seconds": 86400  # Default: 1 din
+        }
+        admin_settings.insert_one(default_settings)
+        return default_settings
     return settings
 
-# Pehli baar run karne par DB initialize karna
-init_db()
