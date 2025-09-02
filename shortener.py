@@ -36,3 +36,4 @@ async def shorten_link(domain: str, api_key: str, long_url: str) -> str | None:
     except Exception as e:
         logger.error(f"Link shorten karte waqt exception: {e}")
         return None
+
