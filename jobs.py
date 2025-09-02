@@ -29,3 +29,4 @@ async def remove_member_job(context):
         logger.error(f"User {user_id} ko channel {channel_id} se remove karne me error: {e}")
     except Exception as e:
         logger.error(f"Remove job me anumanit error: {e}")
+
