@@ -1,7 +1,6 @@
 import logging
 from telegram import Update
 from telegram.ext import Application, CommandHandler
-from telegram.request import Request
 
 # Config se variables import karna
 from config import BOT_TOKEN
@@ -25,11 +24,14 @@ def main() -> None:
     
     logger.info("Bot application banaya ja raha hai...")
     
-    # Connection ke liye timeout values set karna
-    # Yeh Heroku par "Timed out" error se bachne me madad karega
-    request = Request(connect_timeout=10, read_timeout=10)
-    
-    application = Application.builder().token(BOT_TOKEN).request(request).build()
+    # Application builder se seedhe timeout set karna
+    application = (
+        Application.builder()
+        .token(BOT_TOKEN)
+        .connect_timeout(10)
+        .read_timeout(10)
+        .build()
+    )
 
     # User command handlers ko register karna
     application.add_handler(CommandHandler("start", start))
