@@ -1,39 +1,43 @@
-import aiohttp
 import logging
+import aiohttp
 
 logger = logging.getLogger(__name__)
 
 async def shorten_link(domain: str, api_key: str, long_url: str) -> str | None:
     """
-    Diye gaye URL ko shortener API ka use karke shorten karta hai.
-    NOTE: Yeh ek generic implementation hai. Aapko apne shortener service
-    ke API documentation ke hisab se isko badalna pad sakta hai.
+    Shortens a given URL using the specified shortener service.
+    
+    NOTE: This is a generic template. You might need to adjust the API endpoint
+    and response parsing based on your specific URL shortener's documentation.
     """
     if not domain or not api_key:
-        logger.warning("Shortener domain ya API key set nahi hai.")
+        logger.warning("Shortener domain or API key is not set.")
         return None
-        
-    # Example API URL format, ise apne service ke hisab se badlein
+
+    # Construct the API URL for the shortener service
     api_url = f"https://{domain}/api"
+    
+    # The parameters might differ based on your shortener service
     params = {
-        "api": api_key,
-        "url": long_url
+        'api': api_key,
+        'url': long_url,
     }
 
     try:
+        # Make an asynchronous GET request to the shortener API
         async with aiohttp.ClientSession() as session:
             async with session.get(api_url, params=params) as response:
                 if response.status == 200:
-                    # Response format ko check karein (text, json, etc.)
-                    data = await response.text() 
-                    # Ho sakta hai aapko response.json() use karna pade
-                    # Example: `result = await response.json()` and then `return result.get('shortenedUrl')`
-                    logger.info(f"Link successfully shorten hua: {data}")
+                    # Assuming the response is plain text with the shortened URL
+                    data = await response.text()
+                    logger.info(f"Successfully shortened URL: {long_url} -> {data}")
                     return data
                 else:
-                    logger.error(f"Shortener API se error aaya. Status: {response.status}, Response: {await response.text()}")
+                    error_text = await response.text()
+                    logger.error(
+                        f"Failed to shorten link. HTTP Status: {response.status}, Response: {error_text}"
+                    )
                     return None
-    except Exception as e:
-        logger.error(f"Link shorten karte waqt exception: {e}")
+    except aiohttp.ClientError as e:
+        logger.error(f"An error occurred during the API request to the shortener: {e}")
         return None
-
