@@ -1,12 +1,12 @@
 import logging
 from telegram import Update
-from telegram.ext import Application, CommandHandler, JobQueue
+from telegram.ext import Application, CommandHandler, JobQueue, ChatMemberHandler
 
 # Import variables from the config file
 from config import BOT_TOKEN
 
 # Import command handlers
-from handlers.user_commands import start, help_command
+from handlers.user_commands import start, help_command, track_joins
 from handlers.admin_commands import (
     set_channel, my_set_channel, set_domain, set_api, set_time, stats, broadcast, delete_all_settings
 )
@@ -52,6 +52,9 @@ def main() -> None:
     application.add_handler(CommandHandler("stats", stats))
     application.add_handler(CommandHandler("broadcast", broadcast))
     application.add_handler(CommandHandler("dltall", delete_all_settings))
+
+    # --- Register the new join tracker handler ---
+    application.add_handler(ChatMemberHandler(track_joins, ChatMemberHandler.CHAT_MEMBER))
 
     logger.info("Starting bot polling...")
     
