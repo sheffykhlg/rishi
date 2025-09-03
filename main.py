@@ -8,7 +8,7 @@ from config import BOT_TOKEN
 # Handlers import karna
 from handlers.user_commands import start
 from handlers.admin_commands import (
-    set_channel, my_set_channel, set_domain, set_api, set_time, stats, broadcast
+    set_channel, my_set_channel, set_domain, set_api, set_time, stats, broadcast, delete_all_settings
 )
 
 # Logging setup karna
@@ -31,8 +31,8 @@ def main() -> None:
     application = (
         Application.builder()
         .token(BOT_TOKEN)
-        .connect_timeout(15)  # Thoda aur time de dete hain
-        .read_timeout(15)     # Thoda aur time de dete hain
+        .connect_timeout(15)
+        .read_timeout(15)
         .job_queue(job_queue)
         .build()
     )
@@ -48,6 +48,7 @@ def main() -> None:
     application.add_handler(CommandHandler("settime", set_time))
     application.add_handler(CommandHandler("stats", stats))
     application.add_handler(CommandHandler("broadcast", broadcast))
+    application.add_handler(CommandHandler("dltall", delete_all_settings))
 
     logger.info("Bot polling shuru kar raha hai...")
     
