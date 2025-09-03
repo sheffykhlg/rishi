@@ -9,18 +9,22 @@ from database import admin_settings, users_collection
 
 logger = logging.getLogger(__name__)
 
-# Decorator to check if the user is an admin
+# Decorator to restrict a command to the admin only
 def admin_only(func):
+    """
+    A decorator that checks if the user issuing a command is the admin.
+    """
     @wraps(func)
     async def wrapped(update: Update, context: ContextTypes.DEFAULT_TYPE, *args, **kwargs):
         if update.effective_user.id != ADMIN_ID:
-            await update.message.reply_text("⛔️ माफ कीजिए, यह कमांड केवल एडमिन के लिए है।")
+            await update.message.reply_text("⛔️ Sorry, this command is for the admin only.")
             return
         return await func(update, context, *args, **kwargs)
     return wrapped
 
 @admin_only
-async def set_channel(update: Update, context: ContextTypes.DEFAULT_TYPE):
+async def set_channel(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
+    """Sets the target channel ID."""
     try:
         channel_id = int(context.args[0])
         admin_settings.update_one(
@@ -28,21 +32,23 @@ async def set_channel(update: Update, context: ContextTypes.DEFAULT_TYPE):
             {"$set": {"channel_id": channel_id}},
             upsert=True
         )
-        await update.message.reply_text(f"✅ चैनल ID `{channel_id}` सफलतापूर्वक सेट हो गया है।")
+        await update.message.reply_text(f"✅ Channel ID successfully set to `{channel_id}`.")
     except (IndexError, ValueError):
-        await update.message.reply_text("⚠️ कृपया सही फॉर्मेट का उपयोग करें: `/setch <channel_id>`")
+        await update.message.reply_text("⚠️ Please use the correct format: `/setch <channel_id>`")
 
 @admin_only
-async def my_set_channel(update: Update, context: ContextTypes.DEFAULT_TYPE):
+async def my_set_channel(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
+    """Checks the currently set channel ID."""
     settings = admin_settings.find_one({"_id": 1})
     channel_id = settings.get("channel_id") if settings else None
     if channel_id:
-        await update.message.reply_text(f"ℹ️ वर्तमान में सेट चैनल ID है: `{channel_id}`")
+        await update.message.reply_text(f"ℹ️ The current channel ID is: `{channel_id}`")
     else:
-        await update.message.reply_text("ℹ️ अभी तक कोई चैनल सेट नहीं किया गया है। `/setch` का उपयोग करें।")
+        await update.message.reply_text("ℹ️ No channel has been set yet. Use `/setch`.")
 
 @admin_only
-async def set_domain(update: Update, context: ContextTypes.DEFAULT_TYPE):
+async def set_domain(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
+    """Sets the URL shortener domain."""
     try:
         domain = context.args[0]
         admin_settings.update_one(
@@ -50,12 +56,13 @@ async def set_domain(update: Update, context: ContextTypes.DEFAULT_TYPE):
             {"$set": {"shortener_domain": domain}},
             upsert=True
         )
-        await update.message.reply_text(f"✅ Shortener डोमेन `{domain}` सफलतापूर्वक सेट हो गया है।")
+        await update.message.reply_text(f"✅ Shortener domain successfully set to `{domain}`.")
     except IndexError:
-        await update.message.reply_text("⚠️ कृपया सही फॉर्मेट का उपयोग करें: `/setdomain <domain.com>`")
+        await update.message.reply_text("⚠️ Please use the correct format: `/setdomain <domain.com>`")
 
 @admin_only
-async def set_api(update: Update, context: ContextTypes.DEFAULT_TYPE):
+async def set_api(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
+    """Sets the URL shortener API key."""
     try:
         api_key = context.args[0]
         admin_settings.update_one(
@@ -63,14 +70,17 @@ async def set_api(update: Update, context: ContextTypes.DEFAULT_TYPE):
             {"$set": {"shortener_api": api_key}},
             upsert=True
         )
-        await update.message.reply_text("✅ Shortener API की सफलतापूर्वक सेट हो गई है।")
+        await update.message.reply_text("✅ Shortener API key has been set successfully.")
     except IndexError:
-        await update.message.reply_text("⚠️ कृपया सही फॉर्मेट का उपयोग करें: `/setapi <api_key>`")
+        await update.message.reply_text("⚠️ Please use the correct format: `/setapi <api_key>`")
 
 @admin_only
-async def set_time(update: Update, context: ContextTypes.DEFAULT_TYPE):
+async def set_time(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
+    """Sets the duration for how long a user stays in the channel."""
     if not context.args or len(context.args) < 2:
-        await update.message.reply_text("⚠️ फॉर्मेट: `/settime <number> <unit>`\nUnit: `s`, `m`, `h`, `d` (seconds, minutes, hours, days)")
+        await update.message.reply_text(
+            "⚠️ Format: `/settime <number> <unit>`\nUnits: `s`(seconds), `m`(minutes), `h`(hours), `d`(days)"
+        )
         return
     try:
         value = int(context.args[0])
@@ -86,7 +96,7 @@ async def set_time(update: Update, context: ContextTypes.DEFAULT_TYPE):
         elif unit == 'd':
             seconds = value * 86400
         else:
-            await update.message.reply_text("⚠️ अमान्य यूनिट! कृपया `s`, `m`, `h`, or `d` का उपयोग करें।")
+            await update.message.reply_text("⚠️ Invalid unit! Please use `s`, `m`, `h`, or `d`.")
             return
 
         admin_settings.update_one(
@@ -94,34 +104,35 @@ async def set_time(update: Update, context: ContextTypes.DEFAULT_TYPE):
             {"$set": {"invite_duration_seconds": seconds}},
             upsert=True
         )
-        await update.message.reply_text(f"✅ लिंक की वैधता `{value} {unit}` ({seconds} सेकंड) पर सेट कर दी गई है।")
+        await update.message.reply_text(f"✅ User access duration set to `{value} {unit}` ({seconds} seconds).")
     except (IndexError, ValueError):
-        await update.message.reply_text("⚠️ अमान्य फॉर्मेट! `/settime <number> <unit>` का उपयोग करें।")
+        await update.message.reply_text("⚠️ Invalid format! Use `/settime <number> <unit>`.")
 
 @admin_only
-async def stats(update: Update, context: ContextTypes.DEFAULT_TYPE):
+async def stats(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
+    """Gets the total number of users who have started the bot."""
     user_count = users_collection.count_documents({})
-    await update.message.reply_text(f"📊 बॉट के कुल यूजर्स: **{user_count}**")
+    await update.message.reply_text(f"📊 Total users in the bot: **{user_count}**")
 
 @admin_only
-async def delete_all_settings(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    """Database se sabhi admin settings delete karta hai."""
+async def delete_all_settings(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
+    """Deletes and resets all admin settings from the database."""
     try:
         result = admin_settings.delete_one({"_id": 1})
         if result.deleted_count > 0:
-            await update.message.reply_text("✅ Sabhi admin settings safaltapurvak delete kar di gayi hain.")
-            logger.info("Admin settings admin dwara delete kar di gayi hain.")
+            await update.message.reply_text("✅ All admin settings have been successfully deleted.")
+            logger.info("Admin settings have been deleted by the admin.")
         else:
-            await update.message.reply_text("ℹ️ Delete karne ke liye koi settings nahi mili.")
+            await update.message.reply_text("ℹ️ No settings found to delete.")
     except Exception as e:
-        logger.error(f"Settings delete karte waqt error: {e}")
-        await update.message.reply_text("❌ Settings delete karte waqt ek error aa gaya.")
-
+        logger.error(f"Error while deleting settings: {e}")
+        await update.message.reply_text("❌ An error occurred while deleting settings.")
 
 @admin_only
-async def broadcast(update: Update, context: ContextTypes.DEFAULT_TYPE):
+async def broadcast(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
+    """Broadcasts a message to all users of the bot."""
     if not context.args:
-        await update.message.reply_text("⚠️ कृपया ब्रॉडकास्ट करने के लिए एक संदेश लिखें: `/broadcast <message>`")
+        await update.message.reply_text("⚠️ Please provide a message to broadcast: `/broadcast <message>`")
         return
     
     message_to_send = " ".join(context.args)
@@ -130,14 +141,14 @@ async def broadcast(update: Update, context: ContextTypes.DEFAULT_TYPE):
     all_user_ids = [user["_id"] for user in all_users_cursor]
     
     if not all_user_ids:
-        await update.message.reply_text("Broadcast करने के लिए कोई यूजर नहीं है।")
+        await update.message.reply_text("There are no users to broadcast to.")
         return
 
     total_users = len(all_user_ids)
     sent_count = 0
     failed_count = 0
     
-    status_message = await update.message.reply_text(f"📣 ब्रॉडकास्ट शुरू हो रहा है... 0/{total_users} को भेजा गया।")
+    status_message = await update.message.reply_text(f"📣 Starting broadcast... Sent to 0/{total_users}.")
     
     for i, user_id in enumerate(all_user_ids):
         try:
@@ -145,8 +156,9 @@ async def broadcast(update: Update, context: ContextTypes.DEFAULT_TYPE):
             sent_count += 1
         except Exception as e:
             failed_count += 1
-            logger.warning(f"User {user_id} को broadcast भेजने में विफल: {e}")
+            logger.warning(f"Failed to send broadcast to user {user_id}: {e}")
         
+        # Update status message every 10 users or at the end
         if (i + 1) % 10 == 0 or (i + 1) == total_users:
             progress = (i + 1) / total_users
             bar_length = 10
@@ -155,17 +167,17 @@ async def broadcast(update: Update, context: ContextTypes.DEFAULT_TYPE):
             
             try:
                 await status_message.edit_text(
-                    f"📣 ब्रॉडकास्ट जारी है...\n`{bar}`\n"
-                    f"भेजा गया: {sent_count}/{total_users}\n"
-                    f"विफल: {failed_count}",
+                    f"📣 Broadcast in progress...\n`{bar}`\n"
+                    f"Sent: {sent_count}/{total_users}\n"
+                    f"Failed: {failed_count}",
                     parse_mode='MarkdownV2'
                 )
             except Exception:
-                pass
-        await asyncio.sleep(0.1)
+                pass  # Ignore if editing fails (e.g., message not modified)
+        await asyncio.sleep(0.1) # Avoid hitting rate limits
 
     await status_message.edit_text(
-        f"✅ ब्रॉडकास्ट पूरा हुआ!\n\n"
-        f"सफलतापूर्वक भेजा गया: {sent_count}\n"
-        f"विफल हुए: {failed_count}"
+        f"✅ Broadcast complete!\n\n"
+        f"Successfully sent: {sent_count}\n"
+        f"Failed to send: {failed_count}"
     )
