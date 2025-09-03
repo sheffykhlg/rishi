@@ -46,7 +46,7 @@ async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
             return
             
         # Invite link generate karna
-        expire_date = datetime.now() + timedelta(minutes=5)
+        expire_date = datetime.now() + timedelta(minutes=10) # <-- YAHAN 5 SE 10 MINUTE KAR DIYA GAYA HAI
         invite_link_obj = await context.bot.create_chat_invite_link(
             chat_id=channel_id,
             expire_date=expire_date,
@@ -64,7 +64,7 @@ async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
             keyboard = [[InlineKeyboardButton("🔗 चैनल ज्वाइन करें (Free)", url=invite_link)]]
             reply_markup = InlineKeyboardMarkup(keyboard)
             await update.message.reply_text(
-                "🎉 आपका फ्री चैनल एक्सेस लिंक यहाँ है! यह लिंक केवल आपके लिए है और कुछ समय में समाप्त हो जाएगा।",
+                "🎉 आपका फ्री चैनल एक्सेस लिंक यहाँ है! यह लिंक केवल आपके लिए है और 10 मिनट में समाप्त हो जाएगा।",
                 reply_markup=reply_markup
             )
         else:
