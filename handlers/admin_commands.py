@@ -104,6 +104,21 @@ async def stats(update: Update, context: ContextTypes.DEFAULT_TYPE):
     await update.message.reply_text(f"📊 बॉट के कुल यूजर्स: **{user_count}**")
 
 @admin_only
+async def delete_all_settings(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    """Database se sabhi admin settings delete karta hai."""
+    try:
+        result = admin_settings.delete_one({"_id": 1})
+        if result.deleted_count > 0:
+            await update.message.reply_text("✅ Sabhi admin settings safaltapurvak delete kar di gayi hain.")
+            logger.info("Admin settings admin dwara delete kar di gayi hain.")
+        else:
+            await update.message.reply_text("ℹ️ Delete karne ke liye koi settings nahi mili.")
+    except Exception as e:
+        logger.error(f"Settings delete karte waqt error: {e}")
+        await update.message.reply_text("❌ Settings delete karte waqt ek error aa gaya.")
+
+
+@admin_only
 async def broadcast(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if not context.args:
         await update.message.reply_text("⚠️ कृपया ब्रॉडकास्ट करने के लिए एक संदेश लिखें: `/broadcast <message>`")
