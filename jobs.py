@@ -1,32 +1,40 @@
 import logging
-from telegram.error import TelegramError
+from telegram.ext import ContextTypes
+from telegram.error import Forbidden, BadRequest
 
 logger = logging.getLogger(__name__)
 
-async def remove_member_job(context):
-    """JobQueue dwara call kiya jane wala function, user ko channel se remove karne ke liye."""
+async def remove_member_job(context: ContextTypes.DEFAULT_TYPE) -> None:
+    """
+    Job function called by the JobQueue to remove a user from the channel.
+    """
     job_context = context.job.data
     user_id = job_context["user_id"]
     channel_id = job_context["channel_id"]
     
-    logger.info(f"User {user_id} ko channel {channel_id} se remove karne ka samay aa gaya hai.")
+    logger.info(f"Attempting to remove user {user_id} from channel {channel_id}.")
     
     try:
-        # User ko kick karna (ban karna)
+        # Kick (ban) the user to remove them from the channel
         await context.bot.ban_chat_member(chat_id=channel_id, user_id=user_id)
-        # Turant unban karna taki woh future me dobara join kar sake
+        
+        # Immediately unban the user so they can rejoin later with a new link
         await context.bot.unban_chat_member(chat_id=channel_id, user_id=user_id)
         
-        logger.info(f"User {user_id} ko channel {channel_id} se safaltapurvak remove kar diya gaya.")
+        logger.info(f"Successfully removed user {user_id} from channel {channel_id}.")
         
-        # Aap yahan user ko ek notification bhej sakte hain
+        # Optionally, notify the user that their access has expired
         await context.bot.send_message(
             chat_id=user_id,
-            text="Aapka channel access time poora ho gaya hai. Dobara join karne ke liye /start use karein."
+            text="Your access to the channel has expired. Use /start to get a new link."
         )
 
-    except TelegramError as e:
-        logger.error(f"User {user_id} ko channel {channel_id} se remove karne me error: {e}")
+    except Forbidden:
+        logger.error(
+            f"Failed to remove user {user_id}. Bot lacks administrator rights "
+            f"to ban members in channel {channel_id}."
+        )
+    except BadRequest as e:
+        logger.error(f"Failed to remove user {user_id} from {channel_id}: {e.message}")
     except Exception as e:
-        logger.error(f"Remove job me anumanit error: {e}")
-
+        logger.error(f"An unexpected error occurred in the remove job for user {user_id}: {e}")
