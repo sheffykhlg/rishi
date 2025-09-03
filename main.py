@@ -1,4 +1,5 @@
 import logging
+import asyncio
 from telegram import Update
 from telegram.ext import Application, CommandHandler, JobQueue, ChatMemberHandler
 
@@ -29,12 +30,12 @@ def main() -> None:
     # Explicitly create the JobQueue
     job_queue = JobQueue()
     
-    # Build the application and set timeouts and the job queue
+    # Build the application and set longer timeouts and the job queue
     application = (
         Application.builder()
         .token(BOT_TOKEN)
-        .connect_timeout(15)
-        .read_timeout(15)
+        .connect_timeout(30)  # Timeout increased to 30 seconds
+        .read_timeout(30)     # Timeout increased to 30 seconds
         .job_queue(job_queue)
         .build()
     )
@@ -53,13 +54,13 @@ def main() -> None:
     application.add_handler(CommandHandler("broadcast", broadcast))
     application.add_handler(CommandHandler("dltall", delete_all_settings))
 
-    # --- Register the new join tracker handler ---
+    # --- Register the join tracker handler ---
     application.add_handler(ChatMemberHandler(track_joins, ChatMemberHandler.CHAT_MEMBER))
 
     logger.info("Starting bot polling...")
     
-    # Start the JobQueue before running the bot
-    application.job_queue.start()
+    # The application.run_polling() method automatically starts the job queue.
+    # We do NOT need to call application.job_queue.start() manually.
     
     # Run the bot until the user presses Ctrl-C
     application.run_polling(allowed_updates=Update.ALL_TYPES)
