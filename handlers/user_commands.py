@@ -18,6 +18,7 @@ async def start(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     and schedules their removal.
     """
     user_id = update.effective_user.id
+    update_data = None # Initialize update_data to handle different paths
 
     try:
         # Get or create the user in the database
@@ -63,7 +64,7 @@ async def start(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
         
         duration_seconds = settings.get("invite_duration_seconds", 86400)
         
-        # Decide whether to give a free link or a shortened link
+        # Decide whether to give a free link or a different link for returning users
         if not user.get("has_received_free_link"):
             # First time user gets a free link
             update_data = {"$set": {"has_received_free_link": True, "last_link_timestamp": time.time()}}
@@ -74,40 +75,46 @@ async def start(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
                 reply_markup=reply_markup
             )
         else:
-            # Returning user gets a shortened link
+            # --- LOGIC CHANGE: Optional Shortener ---
             shortener_domain = settings.get("shortener_domain")
             shortener_api = settings.get("shortener_api")
             
-            if not shortener_domain or not shortener_api:
-                await update.message.reply_text("⚠️ Sorry, the shortener service is not configured by the admin yet.")
-                return
-
-            await update.message.reply_text("⏳ Please wait, your link is being generated...")
-            
-            shortened_link = await shorten_link(shortener_domain, shortener_api, invite_link)
-            
-            if shortened_link:
-                keyboard = [[InlineKeyboardButton("🔗 Watch Ad & Join Channel", url=shortened_link)]]
+            # If shortener is configured, provide a shortened link
+            if shortener_domain and shortener_api:
+                await update.message.reply_text("⏳ Please wait, your monetized link is being generated...")
+                shortened_link = await shorten_link(shortener_domain, shortener_api, invite_link)
+                
+                if shortened_link:
+                    keyboard = [[InlineKeyboardButton("🔗 Watch Ad & Join Channel", url=shortened_link)]]
+                    reply_markup = InlineKeyboardMarkup(keyboard)
+                    await update.message.reply_text(
+                        "Here is your new link. Please watch the ad to join the channel.",
+                        reply_markup=reply_markup
+                    )
+                    update_data = {"$set": {"last_link_timestamp": time.time()}}
+                else:
+                    await update.message.reply_text("❌ An error occurred while creating the short link. Please try again later.")
+                    return
+            else:
+                # If shortener is NOT configured, provide a direct link
+                keyboard = [[InlineKeyboardButton("🔗 Join Channel (Direct Link)", url=invite_link)]]
                 reply_markup = InlineKeyboardMarkup(keyboard)
                 await update.message.reply_text(
-                    "Here is your new link. Please watch the ad to join the channel.",
+                    "Here is your new direct link to the channel. The admin has not set up the shortener.",
                     reply_markup=reply_markup
                 )
                 update_data = {"$set": {"last_link_timestamp": time.time()}}
-            else:
-                await update.message.reply_text("❌ An error occurred while creating the link. Please try again later.")
-                return
 
-        # Schedule the job to remove the user after the specified duration
-        context.job_queue.run_once(
-            remove_member_job,
-            when=duration_seconds,
-            data={"user_id": user_id, "channel_id": channel_id},
-            name=f"remove_{user_id}_{channel_id}"
-        )
-        
-        users_collection.update_one({"_id": user_id}, update_data)
-        logger.info(f"Scheduled removal job for user {user_id} in {duration_seconds} seconds.")
+        # If a link was successfully provided, schedule the removal job and update the DB
+        if update_data:
+            context.job_queue.run_once(
+                remove_member_job,
+                when=duration_seconds,
+                data={"user_id": user_id, "channel_id": channel_id},
+                name=f"remove_{user_id}_{channel_id}"
+            )
+            users_collection.update_one({"_id": user_id}, update_data)
+            logger.info(f"Scheduled removal job for user {user_id} in {duration_seconds} seconds.")
 
     except Exception as e:
         logger.error(f"Error in /start command for user {user_id}: {e}", exc_info=True)
@@ -117,7 +124,7 @@ async def start(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
 async def help_command(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     """
     Displays a help message with all available commands.
-    Shows admin commands only to the admin.
+    Shows admin commands only to the admin in a step-by-step format.
     """
     user_id = update.effective_user.id
     
@@ -127,15 +134,20 @@ async def help_command(update: Update, context: ContextTypes.DEFAULT_TYPE) -> No
     help_text += "• /start - Get a new channel invite link.\n"
     help_text += "• /help - Show this help message.\n\n"
     
+    # --- HELP COMMAND: Updated Admin Steps ---
     # Check if the user is the admin and add admin commands if so
     if user_id == ADMIN_ID:
-        help_text += "<b><u>For Admin Only:</u></b>\n"
-        help_text += "• /setch `[channel_id]` - Set the target channel ID (e.g., -10012345).\n"
-        help_text += "• /mysetch - Check the currently set channel ID.\n"
-        help_text += "• /setdomain `[domain]` - Set URL shortener domain (e.g., `example.com`).\n"
-        help_text += "• /setapi `[api_key]` - Set the URL shortener API key.\n"
-        help_text += "• /settime `[value] [unit]` - Set user access duration (e.g., `/settime 1 d`).\n"
-        help_text += "    (Units: s, m, h, d)\n"
+        help_text += "<b><u>Admin Setup Guide:</u></b>\n"
+        help_text += "Follow these steps to set up the bot:\n\n"
+        help_text += "1️⃣. **Set Channel:**\n   `/setch [channel_id]`\n   (e.g., `/setch -10012345678`)\n"
+        help_text += "   To check the current channel, use `/mysetch`.\n\n"
+        help_text += "2️⃣. **Set Access Duration:**\n   `/settime [value] [unit]`\n   (e.g., `/settime 1 d` for 1 day).\n"
+        help_text += "   (Units: `s`-seconds, `m`-minutes, `h`-hours, `d`-days)\n\n"
+        help_text += "3️⃣. **Set Shortener (Optional, for earning):**\n"
+        help_text += "   `/setdomain [your_domain.com]`\n"
+        help_text += "   `/setapi [your_api_key]`\n"
+        help_text += "   (If you don't set this, the bot will give direct links).\n\n"
+        help_text += "<b><u>Other Admin Commands:</u></b>\n"
         help_text += "• /stats - Get total bot users.\n"
         help_text += "• /broadcast `[message]` - Send a message to all users.\n"
         help_text += "• /dltall - Delete and reset all admin settings.\n"
