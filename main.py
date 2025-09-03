@@ -1,6 +1,6 @@
 import logging
 from telegram import Update
-from telegram.ext import Application, CommandHandler
+from telegram.ext import Application, CommandHandler, JobQueue
 
 # Config se variables import karna
 from config import BOT_TOKEN
@@ -24,12 +24,16 @@ def main() -> None:
     
     logger.info("Bot application banaya ja raha hai...")
     
-    # Application builder se seedhe timeout set karna
+    # JobQueue (Scheduler) ko explicitly create karna
+    job_queue = JobQueue()
+    
+    # Application builder mein JobQueue ko add karna
     application = (
         Application.builder()
         .token(BOT_TOKEN)
-        .connect_timeout(10)
-        .read_timeout(10)
+        .connect_timeout(15)  # Thoda aur time de dete hain
+        .read_timeout(15)     # Thoda aur time de dete hain
+        .job_queue(job_queue)
         .build()
     )
 
@@ -46,6 +50,10 @@ def main() -> None:
     application.add_handler(CommandHandler("broadcast", broadcast))
 
     logger.info("Bot polling shuru kar raha hai...")
+    
+    # Bot ko run karne se pehle JobQueue ko start karna
+    application.job_queue.start()
+    
     application.run_polling(allowed_updates=Update.ALL_TYPES)
 
 
