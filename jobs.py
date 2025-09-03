@@ -2,12 +2,15 @@ import logging
 from telegram.ext import ContextTypes
 from telegram.error import Forbidden, BadRequest
 
+# Set up logging
 logger = logging.getLogger(__name__)
 
 async def remove_member_job(context: ContextTypes.DEFAULT_TYPE) -> None:
     """
-    Job function called by the JobQueue to remove a user from the channel.
+    This job function is called by the JobQueue to remove a user from the channel
+    after their designated time has expired.
     """
+    # Get user_id and channel_id from the job's data payload
     job_context = context.job.data
     user_id = job_context["user_id"]
     channel_id = job_context["channel_id"]
