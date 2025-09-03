@@ -1,7 +1,7 @@
 import logging
 import time
 from datetime import datetime, timedelta
-from telegram import Update
+from telegram import Update, InlineKeyboardButton, InlineKeyboardMarkup
 from telegram.ext import ContextTypes
 from telegram.error import TelegramError
 
@@ -61,10 +61,11 @@ async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
             # Pehli baar: Free link
             update_data = {"$set": {"has_received_free_link": True, "last_link_timestamp": time.time()}}
             
-            keyboard = [[("🔗 चैनल ज्वाइन करें (Free)", invite_link)]]
+            keyboard = [[InlineKeyboardButton("🔗 चैनल ज्वाइन करें (Free)", url=invite_link)]]
+            reply_markup = InlineKeyboardMarkup(keyboard)
             await update.message.reply_text(
-                "🎉 आपका फ्री चैनल एक्सेस लिंक यहाँ है! यह लिंक केवल आपके लिए है और कुछ समय में समाप्त हो जाएगा।.",
-                reply_markup={"inline_keyboard": keyboard}
+                "🎉 आपका फ्री चैनल एक्सेस लिंक यहाँ है! यह लिंक केवल आपके लिए है और कुछ समय में समाप्त हो जाएगा।",
+                reply_markup=reply_markup
             )
         else:
             # Dusri baar: Shortened link
@@ -80,10 +81,11 @@ async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
             shortened_link = await shorten_link(shortener_domain, shortener_api, invite_link)
             
             if shortened_link:
-                keyboard = [[("🔗 विज्ञापन देखें और चैनल ज्वाइन करें", shortened_link)]]
+                keyboard = [[InlineKeyboardButton("🔗 विज्ञापन देखें और चैनल ज्वाइन करें", url=shortened_link)]]
+                reply_markup = InlineKeyboardMarkup(keyboard)
                 await update.message.reply_text(
                     "यह रहा आपका लिंक। चैनल ज्वाइन करने के लिए कृपया विज्ञापन देखें।",
-                    reply_markup={"inline_keyboard": keyboard}
+                    reply_markup=reply_markup
                 )
                 update_data = {"$set": {"last_link_timestamp": time.time()}}
             else:
