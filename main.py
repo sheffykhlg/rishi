@@ -2,16 +2,16 @@ import logging
 from telegram import Update
 from telegram.ext import Application, CommandHandler, JobQueue
 
-# Config se variables import karna
+# Import variables from the config file
 from config import BOT_TOKEN
 
-# Handlers import karna
-from handlers.user_commands import start
+# Import command handlers
+from handlers.user_commands import start, help_command
 from handlers.admin_commands import (
     set_channel, my_set_channel, set_domain, set_api, set_time, stats, broadcast, delete_all_settings
 )
 
-# Logging setup karna
+# Set up basic logging
 logging.basicConfig(
     format="%(asctime)s - %(name)s - %(levelname)s - %(message)s", level=logging.INFO
 )
@@ -20,14 +20,16 @@ logger = logging.getLogger(__name__)
 
 
 def main() -> None:
-    """Bot ko start aur run karta hai."""
+    """
+    The main function to set up and run the bot.
+    """
     
-    logger.info("Bot application banaya ja raha hai...")
+    logger.info("Building bot application...")
     
-    # JobQueue (Scheduler) ko explicitly create karna
+    # Explicitly create the JobQueue
     job_queue = JobQueue()
     
-    # Application builder mein JobQueue ko add karna
+    # Build the application and set timeouts and the job queue
     application = (
         Application.builder()
         .token(BOT_TOKEN)
@@ -37,10 +39,11 @@ def main() -> None:
         .build()
     )
 
-    # User command handlers ko register karna
+    # --- Register User Command Handlers ---
     application.add_handler(CommandHandler("start", start))
+    application.add_handler(CommandHandler("help", help_command))
 
-    # Admin command handlers ko register karna
+    # --- Register Admin Command Handlers ---
     application.add_handler(CommandHandler("setch", set_channel))
     application.add_handler(CommandHandler("mysetch", my_set_channel))
     application.add_handler(CommandHandler("setdomain", set_domain))
@@ -50,11 +53,12 @@ def main() -> None:
     application.add_handler(CommandHandler("broadcast", broadcast))
     application.add_handler(CommandHandler("dltall", delete_all_settings))
 
-    logger.info("Bot polling shuru kar raha hai...")
+    logger.info("Starting bot polling...")
     
-    # Bot ko run karne se pehle JobQueue ko start karna
+    # Start the JobQueue before running the bot
     application.job_queue.start()
     
+    # Run the bot until the user presses Ctrl-C
     application.run_polling(allowed_updates=Update.ALL_TYPES)
 
 
