@@ -1,7 +1,7 @@
 import logging
 import time
 from datetime import datetime, timedelta
-from telegram import Update, InlineKeyboardButton, InlineKeyboardMarkup
+from telegram import Update
 from telegram.ext import ContextTypes
 from telegram.error import TelegramError
 
@@ -61,11 +61,10 @@ async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
             # Pehli baar: Free link
             update_data = {"$set": {"has_received_free_link": True, "last_link_timestamp": time.time()}}
             
-            keyboard = [[InlineKeyboardButton("🔗 चैनल ज्वाइन करें (Free)", url=invite_link)]]
-            reply_markup = InlineKeyboardMarkup(keyboard)
+            keyboard = [[("🔗 चैनल ज्वाइन करें (Free)", invite_link)]]
             await update.message.reply_text(
-                "🎉 आपका फ्री चैनल एक्सेस लिंक यहाँ है! यह लिंक केवल आपके लिए है और कुछ समय में समाप्त हो जाएगा।",
-                reply_markup=reply_markup
+                "🎉 आपका फ्री चैनल एक्सेस लिंक यहाँ है! यह लिंक केवल आपके लिए है और कुछ समय में समाप्त हो जाएगा।.",
+                reply_markup={"inline_keyboard": keyboard}
             )
         else:
             # Dusri baar: Shortened link
@@ -81,11 +80,10 @@ async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
             shortened_link = await shorten_link(shortener_domain, shortener_api, invite_link)
             
             if shortened_link:
-                keyboard = [[InlineKeyboardButton("🔗 विज्ञापन देखें और चैनल ज्वाइन करें", url=shortened_link)]]
-                reply_markup = InlineKeyboardMarkup(keyboard)
+                keyboard = [[("🔗 विज्ञापन देखें और चैनल ज्वाइन करें", shortened_link)]]
                 await update.message.reply_text(
                     "यह रहा आपका लिंक। चैनल ज्वाइन करने के लिए कृपया विज्ञापन देखें।",
-                    reply_markup=reply_markup
+                    reply_markup={"inline_keyboard": keyboard}
                 )
                 update_data = {"$set": {"last_link_timestamp": time.time()}}
             else:
@@ -106,4 +104,3 @@ async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
     except Exception as e:
         logger.error(f"Start command me error: {e}", exc_info=True)
         await update.message.reply_text("🤖 कुछ आंतरिक त्रुटि हुई है। कृपया एडमिन से संपर्क करें।")
-
