@@ -1,7 +1,7 @@
 import logging
 import time
 from datetime import datetime, timedelta
-from telegram import Update, InlineKeyboardButton, InlineKeyboardMarkup
+from telegram import Update, InlineKeyboardButton, InlineKeyboardMarkup, ChatMember
 from telegram.ext import ContextTypes
 from telegram.error import TelegramError
 
@@ -141,3 +141,50 @@ async def help_command(update: Update, context: ContextTypes.DEFAULT_TYPE) -> No
         help_text += "• /dltall - Delete and reset all admin settings.\n"
         
     await update.message.reply_html(help_text)
+
+
+# --- NEW FUNCTION TO TRACK JOINS ---
+async def track_joins(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
+    """
+    This handler is called whenever a user's status changes in a chat.
+    It checks if a user has joined the configured channel and notifies the admin.
+    """
+    result = update.chat_member
+    if not result:
+        return
+
+    user = result.new_chat_member.user
+    chat_id = result.chat.id
+    
+    # Get the channel ID configured by the admin
+    settings = get_admin_settings()
+    admin_channel_id = settings.get("channel_id")
+
+    # Only track joins for the configured channel
+    if chat_id != admin_channel_id:
+        return
+
+    # Check if the user's status changed from 'not a member' to 'a member'
+    was_member = result.old_chat_member.status in [ChatMember.MEMBER, ChatMember.ADMINISTRATOR, ChatMember.OWNER]
+    is_member = result.new_chat_member.status in [ChatMember.MEMBER, ChatMember.ADMINISTRATOR, ChatMember.OWNER]
+
+    if not was_member and is_member:
+        logger.info(f"{user.full_name} (ID: {user.id}) joined the channel {chat_id}.")
+        
+        # Check if this user is a known user of our bot
+        bot_user = users_collection.find_one({"_id": user.id})
+        
+        if bot_user:
+            # If they are a known bot user, notify the admin
+            notification_message = (
+                f"✅ **User Joined Confirmation**\n\n"
+                f"👤 **User:** {user.mention_html()}\n"
+                f"🆔 **ID:** `{user.id}`\n\n"
+                f"They have successfully joined the channel."
+            )
+            try:
+                await context.bot.send_message(
+                    chat_id=ADMIN_ID, text=notification_message, parse_mode='HTML'
+                )
+            except Exception as e:
+                logger.error(f"Failed to send join notification to admin: {e}")
